@@ -1,11 +1,11 @@
 ---
 # sheet-logger-acyq
 title: Define TypeScript data models
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-05-10T21:41:47Z
-updated_at: 2026-05-10T22:17:06Z
+updated_at: 2026-05-10T22:29:51Z
 parent: sheet-logger-exnv
 ---
 
@@ -19,3 +19,5 @@ A TimeEntry can be attached at any level — Client, Project, Phase, or Task. Th
 **Architectural note:** TimeEntry must store startTime and endTime as timestamps (not just a duration). This keeps the door open for visual timeline editing (resize, split) without a schema migration later.
 
 TimeEntry also needs an optional notes: string field — free-text annotation on what was done during that block. Notes are entered/edited at the entry level, not the task level.
+
+## Summary of Changes\n\nCreated `src/types.ts` with TypeScript interfaces for all five entity levels. `TimeEntry` uses a `TimeEntryTarget` discriminated union (keyed on `level`) to track which hierarchy level the entry is logged against, resolving to the most specific level provided. `startTime`/`endTime` are stored as Unix ms timestamps; `endTime` is `null` while a timer is active. All entities carry `createdAt`/`updatedAt` timestamps.
