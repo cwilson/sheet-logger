@@ -19,6 +19,7 @@ pnpm build      # Type-check (tsc -b) then bundle
 pnpm preview    # Preview production build
 pnpm lint       # Run ESLint
 pnpm test       # Run Vitest (watch mode)
+pnpm autoformat # Prettier --write to fix formatting
 ```
 
 Use `pnpm` — the lockfile is committed and the project is pnpm-only.

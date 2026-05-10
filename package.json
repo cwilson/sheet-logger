@@ -9,7 +9,8 @@
         "lint": "eslint .",
         "preview": "vite preview",
         "prepare": "husky",
-        "test": "vitest"
+        "test": "vitest",
+        "autoformat": "prettier --write '**/*.{ts,tsx,css,md}'"
     },
     "dependencies": {
         "@fontsource-variable/noto-sans": "^5.2.10",
@@ -48,6 +49,6 @@
     },
     "lint-staged": {
         "*.{ts,tsx}": "eslint --fix",
-        "*.{ts,tsx,css,md}": "prettier --write --check"
+        "*.{ts,tsx,css,md}": "prettier --check"
     }
 }
