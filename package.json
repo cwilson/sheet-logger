@@ -5,11 +5,12 @@
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc -b && vite build",
+        "build": "tsc -p tsconfig.app.json && vite build",
         "lint": "eslint .",
         "preview": "vite preview",
         "prepare": "husky",
         "test": "vitest",
+        "typecheck": "tsc --project tsconfig.app.json",
         "autoformat": "prettier --write '**/*.{ts,tsx,css,md}'"
     },
     "dependencies": {
@@ -24,7 +25,8 @@
         "shadcn": "^4.7.0",
         "tailwind-merge": "^3.5.0",
         "tailwindcss": "^4.3.0",
-        "tw-animate-css": "^1.4.0"
+        "tw-animate-css": "^1.4.0",
+        "zustand": "^5.0.13"
     },
     "devDependencies": {
         "@eslint-react/eslint-plugin": "^5.7.5",
