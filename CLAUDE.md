@@ -46,6 +46,7 @@ Sheet Logger is a **client-side-only** React SPA for consultants to log billable
 - **shadcn components** use the "radix-lyra" style with "mist" color palette and Phosphor icons — stay consistent when adding components
 - **CVA** (`class-variance-authority`) is the pattern for component variants (see `src/components/ui/button.tsx`)
 - **`cn()`** in `src/lib/utils.ts` merges Tailwind classes via clsx + tailwind-merge; use it everywhere class names are composed
+- **File naming:** all source files use lowercase kebab-case (e.g. `day-view.tsx`, `layout.tsx`); component exports remain PascalCase
 
 ## Code Quality
 
