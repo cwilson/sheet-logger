@@ -20,6 +20,7 @@ pnpm preview    # Preview production build
 pnpm lint       # Run ESLint
 pnpm test       # Run Vitest (watch mode)
 pnpm autoformat # Prettier --write to fix formatting
+pnpm typecheck  # Run Type-check only
 ```
 
 Use `pnpm` — the lockfile is committed and the project is pnpm-only.
