@@ -29,7 +29,12 @@ import type { Client, Phase, Project, Task } from "@/types";
 
 // ── Grid columns ──────────────────────────────────────────────────────────────
 
-const COLS = "grid grid-cols-[140px_72px_200px_150px_1fr_32px]";
+const COLS = "grid grid-cols-[140px_1fr_150px_1fr_32px]";
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const projectLabel = (p: Project) =>
+    p.code ? `${p.code} · ${p.name}` : p.name;
 
 // ── Entity combobox ───────────────────────────────────────────────────────────
 
@@ -163,6 +168,92 @@ function EntityCombobox({
     );
 }
 
+// ── Client field: combobox + [+] popover ─────────────────────────────────────
+
+function ClientField({
+    value,
+    onChange,
+}: {
+    value: string | null;
+    onChange: (id: string) => void;
+}) {
+    const clients = useStore(useShallow(selectClients));
+    const addClient = useStore((s) => s.addClient);
+    const [popOpen, setPopOpen] = useState(false);
+    const [newName, setNewName] = useState("");
+    const nameRef = useRef<HTMLInputElement>(null);
+
+    const options: ComboOption[] = clients.map((c) => ({
+        id: c.id,
+        label: c.name,
+    }));
+
+    const openPop = (o: boolean) => {
+        setPopOpen(o);
+        if (o) setTimeout(() => nameRef.current?.focus(), 0);
+        else setNewName("");
+    };
+
+    const create = () => {
+        if (!newName.trim()) return;
+        const client = addClient(newName.trim());
+        onChange(client.id);
+        openPop(false);
+    };
+
+    return (
+        <div className="flex h-full items-center">
+            <div className="flex-1 h-full min-w-0">
+                <EntityCombobox
+                    value={value}
+                    onChange={onChange}
+                    onCreate={(name) => {
+                        const client = addClient(name);
+                        return client.id;
+                    }}
+                    options={options}
+                    placeholder="Client"
+                />
+            </div>
+            <Popover open={popOpen} onOpenChange={openPop}>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="shrink-0 mr-0.5"
+                        title="New client"
+                    >
+                        <Plus size={11} />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-52 p-3" align="end">
+                    <p className="text-xs font-medium mb-2">New client</p>
+                    <div className="flex flex-col gap-1.5">
+                        <Input
+                            ref={nameRef}
+                            placeholder="Name"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") create();
+                            }}
+                            className="h-7"
+                        />
+                        <Button
+                            size="sm"
+                            className="mt-0.5"
+                            onClick={create}
+                            disabled={!newName.trim()}
+                        >
+                            Create
+                        </Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
+        </div>
+    );
+}
+
 // ── Project field: combobox + [+] popover ─────────────────────────────────────
 
 function ProjectField({
@@ -187,8 +278,7 @@ function ProjectField({
 
     const options: ComboOption[] = projects.map((p) => ({
         id: p.id,
-        label: p.name,
-        sublabel: p.code,
+        label: projectLabel(p),
     }));
 
     const openPop = (o: boolean) => {
@@ -201,12 +291,8 @@ function ProjectField({
     };
 
     const create = () => {
-        if (!clientId || !newName.trim()) return;
-        const project = addProject(
-            clientId,
-            newName.trim(),
-            newCode.trim() || undefined,
-        );
+        if (!clientId || !newName.trim() || !newCode.trim()) return;
+        const project = addProject(clientId, newName.trim(), newCode.trim());
         onChange(project.id);
         openPop(false);
     };
@@ -245,9 +331,103 @@ function ProjectField({
                             className="h-7"
                         />
                         <Input
-                            placeholder="Code (optional)"
+                            placeholder="Code"
                             value={newCode}
                             onChange={(e) => setNewCode(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter") create();
+                            }}
+                            className="h-7"
+                        />
+                        <Button
+                            size="sm"
+                            className="mt-0.5"
+                            onClick={create}
+                            disabled={!newName.trim() || !newCode.trim()}
+                        >
+                            Create
+                        </Button>
+                    </div>
+                </PopoverContent>
+            </Popover>
+        </div>
+    );
+}
+
+// ── Phase field: combobox + [+] popover ──────────────────────────────────────
+
+function PhaseField({
+    projectId,
+    value,
+    onChange,
+}: {
+    projectId: string | null;
+    value: string | null;
+    onChange: (id: string) => void;
+}) {
+    const allPhases = useStore(useShallow(selectPhases));
+    const addPhase = useStore((s) => s.addPhase);
+    const [popOpen, setPopOpen] = useState(false);
+    const [newName, setNewName] = useState("");
+    const nameRef = useRef<HTMLInputElement>(null);
+
+    const phases = projectId
+        ? allPhases.filter((ph) => ph.projectId === projectId)
+        : [];
+
+    const options: ComboOption[] = phases.map((ph) => ({
+        id: ph.id,
+        label: ph.name,
+    }));
+
+    const openPop = (o: boolean) => {
+        setPopOpen(o);
+        if (o) setTimeout(() => nameRef.current?.focus(), 0);
+        else setNewName("");
+    };
+
+    const create = () => {
+        if (!projectId || !newName.trim()) return;
+        const phase = addPhase(projectId, newName.trim());
+        onChange(phase.id);
+        openPop(false);
+    };
+
+    return (
+        <div className="flex h-full items-center">
+            <div className="flex-1 h-full min-w-0">
+                <EntityCombobox
+                    value={value}
+                    onChange={onChange}
+                    onCreate={(name) => {
+                        if (!projectId) return "";
+                        return addPhase(projectId, name).id;
+                    }}
+                    options={options}
+                    placeholder="Phase"
+                    disabled={!projectId}
+                />
+            </div>
+            <Popover open={popOpen} onOpenChange={openPop}>
+                <PopoverTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        disabled={!projectId}
+                        className="shrink-0 mr-0.5"
+                        title="New phase"
+                    >
+                        <Plus size={11} />
+                    </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-52 p-3" align="end">
+                    <p className="text-xs font-medium mb-2">New phase</p>
+                    <div className="flex flex-col gap-1.5">
+                        <Input
+                            ref={nameRef}
+                            placeholder="Name"
+                            value={newName}
+                            onChange={(e) => setNewName(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === "Enter") create();
                             }}
@@ -293,13 +473,10 @@ function FilledRow({
             <div className="flex items-center h-full px-2 truncate">
                 <span className="text-xs truncate">{client.name}</span>
             </div>
-            <div className="flex items-center h-full px-2">
-                <span className="text-xs font-mono text-muted-foreground truncate">
-                    {project.code ?? ""}
-                </span>
-            </div>
             <div className="flex items-center h-full px-2 truncate">
-                <span className="text-xs truncate">{project.name}</span>
+                <span className="text-xs truncate">
+                    {projectLabel(project)}
+                </span>
             </div>
             <div className="flex items-center h-full px-2 truncate">
                 <span className="text-xs text-muted-foreground truncate">
@@ -326,52 +503,11 @@ function FilledRow({
 // ── Empty add row ─────────────────────────────────────────────────────────────
 
 function EmptyRow() {
-    const clients = useStore(useShallow(selectClients));
-    const allPhases = useStore(useShallow(selectPhases));
-    const allProjects = useStore(useShallow(selectProjects));
-    const addClient = useStore((s) => s.addClient);
-    const addPhase = useStore((s) => s.addPhase);
     const addTask = useStore((s) => s.addTask);
-
     const [clientId, setClientId] = useState<string | null>(null);
     const [projectId, setProjectId] = useState<string | null>(null);
     const [phaseId, setPhaseId] = useState<string | null>(null);
     const [taskName, setTaskName] = useState("");
-
-    const project = projectId
-        ? allProjects.find((p) => p.id === projectId)
-        : null;
-
-    const clientOptions: ComboOption[] = clients.map((c) => ({
-        id: c.id,
-        label: c.name,
-    }));
-
-    const phaseOptions: ComboOption[] = allPhases
-        .filter((ph) => ph.projectId === projectId)
-        .map((ph) => ({ id: ph.id, label: ph.name }));
-
-    const handleClientChange = (id: string) => {
-        setClientId(id);
-        setProjectId(null);
-        setPhaseId(null);
-    };
-
-    const handleProjectChange = (id: string) => {
-        setProjectId(id);
-        setPhaseId(null);
-    };
-
-    const handleCreateClient = (name: string): string => {
-        const client = addClient(name);
-        return client.id;
-    };
-
-    const handleCreatePhase = (name: string): string => {
-        if (!projectId) return "";
-        const phase = addPhase(projectId, name);
-        return phase.id;
-    };
 
     const commit = () => {
         if (!projectId || !taskName.trim()) return;
@@ -390,34 +526,30 @@ function EmptyRow() {
             )}
         >
             <div className="h-full">
-                <EntityCombobox
+                <ClientField
                     value={clientId}
-                    onChange={handleClientChange}
-                    onCreate={handleCreateClient}
-                    options={clientOptions}
-                    placeholder="Client"
+                    onChange={(id) => {
+                        setClientId(id);
+                        setProjectId(null);
+                        setPhaseId(null);
+                    }}
                 />
-            </div>
-            <div className="flex items-center px-2 h-full">
-                <span className="text-xs font-mono text-muted-foreground truncate">
-                    {project?.code ?? ""}
-                </span>
             </div>
             <div className="h-full">
                 <ProjectField
                     clientId={clientId}
                     value={projectId}
-                    onChange={handleProjectChange}
+                    onChange={(id) => {
+                        setProjectId(id);
+                        setPhaseId(null);
+                    }}
                 />
             </div>
             <div className="h-full">
-                <EntityCombobox
+                <PhaseField
+                    projectId={projectId}
                     value={phaseId}
                     onChange={(id) => setPhaseId(id)}
-                    onCreate={handleCreatePhase}
-                    options={phaseOptions}
-                    placeholder="Phase"
-                    disabled={!projectId}
                 />
             </div>
             <div className="flex items-center px-2 h-full">
@@ -482,15 +614,13 @@ export const Config = () => {
                         "h-8 border-b bg-muted/50 divide-x divide-border items-center",
                     )}
                 >
-                    {["Client", "Code", "Project", "Phase", "Task", ""].map(
-                        (col) => (
-                            <div key={col} className="px-2">
-                                <span className="text-xs font-medium text-muted-foreground">
-                                    {col}
-                                </span>
-                            </div>
-                        ),
-                    )}
+                    {["Client", "Project", "Phase", "Task", ""].map((col) => (
+                        <div key={col} className="px-2">
+                            <span className="text-xs font-medium text-muted-foreground">
+                                {col}
+                            </span>
+                        </div>
+                    ))}
                 </div>
 
                 {/* Filled rows */}

@@ -35,7 +35,7 @@ interface Actions {
     removeClientCascade: (id: string) => void;
 
     // Projects
-    addProject: (clientId: string, name: string, code?: string) => Project;
+    addProject: (clientId: string, name: string, code: string) => Project;
     updateProject: (
         id: string,
         patch: Partial<Pick<Project, "name" | "code">>,
@@ -163,7 +163,7 @@ export const useStore = create<StoreState>()(
                     id: uid(),
                     clientId,
                     name,
-                    ...(code ? { code } : {}),
+                    code,
                     createdAt: now(),
                     updatedAt: now(),
                 };
