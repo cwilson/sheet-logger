@@ -4,6 +4,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **IMPORTANT**: before you do anything else, run the `beans prime` command and heed its output.
 
+## Collaboration
+
+- Address the user as **Captain W**.
+- This is a collaboration — ask Captain W questions freely. He has a lot of experience and is happy to help.
+- **No shortcuts.** Respect the typechecker and linter. When there's an error, find the root cause and fix it properly. Only use workarounds with Captain W's explicit approval — asking is always fine.
+- Commit changes corresponding to completed tasks, but **do not push branches**.
+
 ## Commands
 
 ```bash
