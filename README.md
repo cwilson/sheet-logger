@@ -1,73 +1,40 @@
-# React + TypeScript + Vite
+# Sheet Logger
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Overview
 
-Currently, two official plugins are available:
+This repository holds a serverless React SPA for consultants to track time against project tasks for various clients.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The client-task hierarchy is:
 
-## React Compiler
+Client -> Project -> Phase -> Task
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+Phase and task may not be known or may be added/changed after the time is logged.
 
-## Expanding the ESLint configuration
+Logged time entries will require at least (client, project) to be specified.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+A time entry includes a duration of work (in hours with 15 mins as the minimum granularity) and a note of the work done. The consultant is responsible for providing the note.
 
-```js
-export default defineConfig([
-    globalIgnores(['dist']),
-    {
-        files: ['**/*.{ts,tsx}'],
-        extends: [
-            // Other configs...
+Consultants are provided with a timer to aid in task timing. When the timer is started, the consultant specifies a project task and optionally a note of the work done. The consultant can also optionally give an estimate for the work. If the timer is still running for the estimate duration, Sheet Logger will notify the consultant and check if the task is still being worked on.
 
-            // Remove tseslint.configs.recommended and replace with this
-            tseslint.configs.recommendedTypeChecked,
-            // Alternatively, use this for stricter rules
-            tseslint.configs.strictTypeChecked,
-            // Optionally, add this for stylistic rules
-            tseslint.configs.stylisticTypeChecked,
+Consultants can also manually enter a time entry. They'd need to provide the project-task info and duration or start/stop time, plus note.
 
-            // Other configs...
-        ],
-        languageOptions: {
-            parserOptions: {
-                project: ['./tsconfig.node.json', './tsconfig.app.json'],
-                tsconfigRootDir: import.meta.dirname,
-            },
-            // other options...
-        },
-    },
-]);
-```
+The goal of the consultant is to have 8 hours of client-billable work per day. Sheet Logger shows a "day" view tracking the day's work and progress towards the 8 hours of work. The day view shows a list of the work done. Each list item represents a client task that the consultant worked on that day (or expects to work on) and allows logging work or starting a timer for each task.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Sheet Logger also keeps a tally of the work done for the work week, which of course is to have 40 hours of client-billable work, presented in a easy-to-digest view. The "week" view also shows a table of the work done, where each record represents a client task and has columns for hours logged on each day (plus a way to copy the notes for the day). This allows easy manual transfer of the week's work into the consultant's timesheet software.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x';
-import reactDom from 'eslint-plugin-react-dom';
+## Tenets
 
-export default defineConfig([
-    globalIgnores(['dist']),
-    {
-        files: ['**/*.{ts,tsx}'],
-        extends: [
-            // Other configs...
-            // Enable lint rules for React
-            reactX.configs['recommended-typescript'],
-            // Enable lint rules for React DOM
-            reactDom.configs.recommended,
-        ],
-        languageOptions: {
-            parserOptions: {
-                project: ['./tsconfig.node.json', './tsconfig.app.json'],
-                tsconfigRootDir: import.meta.dirname,
-            },
-            // other options...
-        },
-    },
-]);
+The tenets of Sheet Logger are:
+
+- client application operating on local data only. NO DATA TRANSFER!
+- can leverage browser features, even ones that are considered annoying (notifications and sounds)
+- lightweight and scrappy.
+
+## How to run
+
+```sh
+yarn dev       # run dev server
+yarn build     # build the dist
+yarn test run  # run vitest
+yarn lint      # run eslint
 ```
