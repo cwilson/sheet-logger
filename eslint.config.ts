@@ -31,4 +31,13 @@ export default defineConfig({
     rules: {
         "@eslint-react/no-missing-key": "warn",
     },
+
+    settings: {
+        "import/resolver": {
+            alias: {
+                map: [["@", "./src"]],
+                extensions: [".js", ".jsx", ".ts", ".tsx"],
+            },
+        },
+    },
 });
