@@ -1,11 +1,11 @@
 ---
 # sheet-logger-e494
 title: "Entity management: create and edit clients, projects, phases, and tasks"
-status: todo
+status: in-progress
 type: feature
 priority: normal
 created_at: 2026-05-10T21:41:55Z
-updated_at: 2026-05-10T22:10:58Z
+updated_at: 2026-05-10T22:46:06Z
 parent: sheet-logger-rfor
 ---
 

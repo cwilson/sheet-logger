@@ -9,6 +9,7 @@ export interface Project {
     id: string;
     clientId: string;
     name: string;
+    code?: string;
     createdAt: number;
     updatedAt: number;
 }

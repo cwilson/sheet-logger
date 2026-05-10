@@ -32,16 +32,22 @@ interface Actions {
     addClient: (name: string) => Client;
     updateClient: (id: string, patch: Partial<Pick<Client, "name">>) => void;
     removeClient: (id: string) => void;
+    removeClientCascade: (id: string) => void;
 
     // Projects
-    addProject: (clientId: string, name: string) => Project;
-    updateProject: (id: string, patch: Partial<Pick<Project, "name">>) => void;
+    addProject: (clientId: string, name: string, code?: string) => Project;
+    updateProject: (
+        id: string,
+        patch: Partial<Pick<Project, "name" | "code">>,
+    ) => void;
     removeProject: (id: string) => void;
+    removeProjectCascade: (id: string) => void;
 
     // Phases
     addPhase: (projectId: string, name: string) => Phase;
     updatePhase: (id: string, patch: Partial<Pick<Phase, "name">>) => void;
     removePhase: (id: string) => void;
+    removePhaseCascade: (id: string) => void;
 
     // Tasks
     addTask: (projectId: string, name: string, phaseId?: string) => Task;
@@ -122,13 +128,42 @@ export const useStore = create<StoreState>()(
                     return { clients };
                 });
             },
+            removeClientCascade(clientId) {
+                set((s) => {
+                    const projectIds = Object.values(s.projects)
+                        .filter((p) => p.clientId === clientId)
+                        .map((p) => p.id);
+                    const phaseIds = Object.values(s.phases)
+                        .filter((ph) => projectIds.includes(ph.projectId))
+                        .map((ph) => ph.id);
+                    const clients = { ...s.clients };
+                    delete clients[clientId];
+                    const projects = Object.fromEntries(
+                        Object.entries(s.projects).filter(
+                            ([, p]) => p.clientId !== clientId,
+                        ),
+                    );
+                    const phases = Object.fromEntries(
+                        Object.entries(s.phases).filter(
+                            ([id]) => !phaseIds.includes(id),
+                        ),
+                    );
+                    const tasks = Object.fromEntries(
+                        Object.entries(s.tasks).filter(
+                            ([, t]) => !projectIds.includes(t.projectId),
+                        ),
+                    );
+                    return { clients, projects, phases, tasks };
+                });
+            },
 
             // ── Projects ───────────────────────────────────────────────────
-            addProject(clientId, name) {
+            addProject(clientId, name, code) {
                 const project: Project = {
                     id: uid(),
                     clientId,
                     name,
+                    ...(code ? { code } : {}),
                     createdAt: now(),
                     updatedAt: now(),
                 };
@@ -154,6 +189,26 @@ export const useStore = create<StoreState>()(
                     const projects = { ...s.projects };
                     delete projects[id];
                     return { projects };
+                });
+            },
+            removeProjectCascade(projectId) {
+                set((s) => {
+                    const phaseIds = Object.values(s.phases)
+                        .filter((ph) => ph.projectId === projectId)
+                        .map((ph) => ph.id);
+                    const projects = { ...s.projects };
+                    delete projects[projectId];
+                    const phases = Object.fromEntries(
+                        Object.entries(s.phases).filter(
+                            ([id]) => !phaseIds.includes(id),
+                        ),
+                    );
+                    const tasks = Object.fromEntries(
+                        Object.entries(s.tasks).filter(
+                            ([, t]) => t.projectId !== projectId,
+                        ),
+                    );
+                    return { projects, phases, tasks };
                 });
             },
 
@@ -186,6 +241,18 @@ export const useStore = create<StoreState>()(
                     const phases = { ...s.phases };
                     delete phases[id];
                     return { phases };
+                });
+            },
+            removePhaseCascade(phaseId) {
+                set((s) => {
+                    const phases = { ...s.phases };
+                    delete phases[phaseId];
+                    const tasks = Object.fromEntries(
+                        Object.entries(s.tasks).filter(
+                            ([, t]) => t.phaseId !== phaseId,
+                        ),
+                    );
+                    return { phases, tasks };
                 });
             },
 
