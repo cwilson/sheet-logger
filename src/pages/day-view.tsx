@@ -31,6 +31,7 @@ import {
     PlusIcon,
     PencilSimpleIcon,
     TrashIcon,
+    ScissorsIcon,
     CaretLeftIcon,
     CaretRightIcon,
     CaretDownIcon,
@@ -356,15 +357,225 @@ const EntryDialog = ({
     );
 };
 
+// ─── Split Dialog ─────────────────────────────────────────────────────────────
+
+interface SplitDialogProps {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    entry: TimeEntry;
+}
+
+// Mounted fresh via `key` on each open.
+const SplitDialog = ({ open, onOpenChange, entry }: SplitDialogProps) => {
+    const addTimeEntry = useStore((s) => s.addTimeEntry);
+    const updateTimeEntry = useStore((s) => s.updateTimeEntry);
+
+    const entryDate = msToDateStr(entry.startTime);
+    const midMs =
+        entry.endTime !== null
+            ? Math.round((entry.startTime + entry.endTime) / 2 / 60_000) *
+              60_000
+            : entry.startTime + 30 * 60_000;
+
+    const t = entry.target;
+    const [splitTime, setSplitTime] = useState(() => msToTimeStr(midMs));
+    const [secondTaskId, setSecondTaskId] = useState(() =>
+        "taskId" in t ? t.taskId : "",
+    );
+    const [secondClientId, setSecondClientId] = useState(() =>
+        "clientId" in t ? t.clientId : "",
+    );
+    const [secondProjectId, setSecondProjectId] = useState(() =>
+        "projectId" in t ? t.projectId : "",
+    );
+    const [secondPhaseId, setSecondPhaseId] = useState<string | undefined>(
+        () => ("phaseId" in t && t.phaseId ? t.phaseId : undefined),
+    );
+    const [secondNotes, setSecondNotes] = useState("");
+    const [errors, setErrors] = useState<{
+        splitTime?: string;
+        secondTaskId?: string;
+    }>({});
+
+    const splitMs = splitTime ? dateTimeToMs(entryDate, splitTime) : null;
+    const firstDuration =
+        splitMs !== null && splitMs > entry.startTime
+            ? splitMs - entry.startTime
+            : null;
+    const secondDuration =
+        splitMs !== null && entry.endTime !== null && splitMs < entry.endTime
+            ? entry.endTime - splitMs
+            : null;
+
+    const handleSplit = () => {
+        const errs: { splitTime?: string; secondTaskId?: string } = {};
+        if (
+            !splitMs ||
+            splitMs <= entry.startTime ||
+            (entry.endTime !== null && splitMs >= entry.endTime)
+        ) {
+            errs.splitTime = "Split time must be between entry start and end.";
+        }
+        if (!secondTaskId)
+            errs.secondTaskId = "Please select a task for the second segment.";
+        if (Object.keys(errs).length) {
+            setErrors(errs);
+            return;
+        }
+
+        const secondTarget: TimeEntryTarget = {
+            level: "task",
+            clientId: secondClientId,
+            projectId: secondProjectId,
+            ...(secondPhaseId ? { phaseId: secondPhaseId } : {}),
+            taskId: secondTaskId,
+        };
+
+        updateTimeEntry(entry.id, { endTime: splitMs! });
+        addTimeEntry({
+            target: secondTarget,
+            startTime: splitMs!,
+            endTime: entry.endTime,
+            notes: secondNotes || undefined,
+        });
+
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Split time entry</DialogTitle>
+                </DialogHeader>
+
+                <div className="grid gap-4">
+                    <div className="rounded-md bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                            Original:
+                        </span>{" "}
+                        {msToTimeStr(entry.startTime)} –{" "}
+                        {entry.endTime !== null
+                            ? msToTimeStr(entry.endTime)
+                            : "running"}
+                        {entry.endTime !== null && (
+                            <>
+                                {" · "}
+                                {formatDuration(
+                                    entry.endTime - entry.startTime,
+                                )}
+                            </>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="mb-1 block text-xs text-muted-foreground">
+                            Split at
+                        </label>
+                        <Input
+                            type="time"
+                            value={splitTime}
+                            onChange={(e) => {
+                                setSplitTime(e.target.value);
+                                if (errors.splitTime)
+                                    setErrors((er) => ({
+                                        ...er,
+                                        splitTime: undefined,
+                                    }));
+                            }}
+                        />
+                        {errors.splitTime && (
+                            <p className="mt-1 text-xs text-destructive">
+                                {errors.splitTime}
+                            </p>
+                        )}
+                        {firstDuration !== null && secondDuration !== null && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                First:{" "}
+                                <span className="font-medium text-foreground">
+                                    {formatDuration(firstDuration)}
+                                </span>
+                                {" · "}Second:{" "}
+                                <span className="font-medium text-foreground">
+                                    {formatDuration(secondDuration)}
+                                </span>
+                            </p>
+                        )}
+                    </div>
+
+                    <div>
+                        <p className="mb-2 text-xs font-medium">
+                            Second segment
+                        </p>
+                        <div className="grid gap-2">
+                            <div>
+                                <label className="mb-1 block text-xs text-muted-foreground">
+                                    Task
+                                </label>
+                                <TaskPicker
+                                    value={secondTaskId}
+                                    onChange={(tid, cid, pid, phid) => {
+                                        setSecondTaskId(tid);
+                                        setSecondClientId(cid);
+                                        setSecondProjectId(pid);
+                                        setSecondPhaseId(phid);
+                                        if (errors.secondTaskId)
+                                            setErrors((er) => ({
+                                                ...er,
+                                                secondTaskId: undefined,
+                                            }));
+                                    }}
+                                />
+                                {errors.secondTaskId && (
+                                    <p className="mt-1 text-xs text-destructive">
+                                        {errors.secondTaskId}
+                                    </p>
+                                )}
+                            </div>
+                            <div>
+                                <label className="mb-1 block text-xs text-muted-foreground">
+                                    Notes (optional)
+                                </label>
+                                <Textarea
+                                    value={secondNotes}
+                                    onChange={(e) =>
+                                        setSecondNotes(e.target.value)
+                                    }
+                                    placeholder="What did you work on?"
+                                    rows={2}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button
+                        variant="outline"
+                        onClick={() => onOpenChange(false)}
+                    >
+                        Cancel
+                    </Button>
+                    <Button onClick={handleSplit}>
+                        <ScissorsIcon />
+                        Split
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
 // ─── Entry Row ────────────────────────────────────────────────────────────────
 
 interface EntryRowProps {
     entry: TimeEntry;
     onEdit: () => void;
     onDelete: () => void;
+    onSplit: () => void;
 }
 
-const EntryRow = ({ entry, onEdit, onDelete }: EntryRowProps) => {
+const EntryRow = ({ entry, onEdit, onDelete, onSplit }: EntryRowProps) => {
     const duration =
         entry.endTime !== null
             ? formatDuration(entry.endTime - entry.startTime)
@@ -394,6 +605,16 @@ const EntryRow = ({ entry, onEdit, onDelete }: EntryRowProps) => {
                 >
                     <PencilSimpleIcon />
                 </Button>
+                {entry.endTime !== null && (
+                    <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        onClick={onSplit}
+                        title="Split"
+                    >
+                        <ScissorsIcon />
+                    </Button>
+                )}
                 <Button
                     variant="ghost"
                     size="icon-xs"
@@ -415,6 +636,7 @@ interface TaskGroupRowProps {
     onEdit: (entry: TimeEntry) => void;
     onDelete: (id: string) => void;
     onAdd: (preset: TaskPreset) => void;
+    onSplit: (entry: TimeEntry) => void;
 }
 
 const TaskGroupRow = ({
@@ -422,6 +644,7 @@ const TaskGroupRow = ({
     onEdit,
     onDelete,
     onAdd,
+    onSplit,
 }: TaskGroupRowProps) => {
     const [open, setOpen] = useState(true);
 
@@ -466,6 +689,7 @@ const TaskGroupRow = ({
                         entry={entry}
                         onEdit={() => onEdit(entry)}
                         onDelete={() => onDelete(entry.id)}
+                        onSplit={() => onSplit(entry)}
                     />
                 ))}
             </CollapsibleContent>
@@ -528,6 +752,9 @@ export const DayView = () => {
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
     const [addPreset, setAddPreset] = useState<TaskPreset | null>(null);
+    const [splitDialogKey, setSplitDialogKey] = useState(0);
+    const [splitDialogOpen, setSplitDialogOpen] = useState(false);
+    const [splitEntry, setSplitEntry] = useState<TimeEntry | null>(null);
 
     const allEntries = useStore(useShallow(selectTimeEntries));
     const tasks = useStore((s) => s.tasks);
@@ -563,6 +790,12 @@ export const DayView = () => {
         setEditingEntry(entry);
         setDialogKey((k) => k + 1);
         setDialogOpen(true);
+    };
+
+    const openSplit = (entry: TimeEntry) => {
+        setSplitEntry(entry);
+        setSplitDialogKey((k) => k + 1);
+        setSplitDialogOpen(true);
     };
 
     return (
@@ -630,6 +863,7 @@ export const DayView = () => {
                             onEdit={openEdit}
                             onDelete={removeTimeEntry}
                             onAdd={openAdd}
+                            onSplit={openSplit}
                         />
                     ))
                 )}
@@ -643,6 +877,14 @@ export const DayView = () => {
                 defaultDate={viewDate}
                 preset={addPreset}
             />
+            {splitEntry && (
+                <SplitDialog
+                    key={splitDialogKey}
+                    open={splitDialogOpen}
+                    onOpenChange={setSplitDialogOpen}
+                    entry={splitEntry}
+                />
+            )}
         </div>
     );
 };
