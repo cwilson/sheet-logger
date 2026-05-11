@@ -55,5 +55,8 @@
     "lint-staged": {
         "*.{ts,tsx}": "eslint --fix",
         "*.{ts,tsx,css,md}": "prettier --check"
+    },
+    "pnpm": {
+        "ignoredBuiltDependencies": ["msw"]
     }
 }
