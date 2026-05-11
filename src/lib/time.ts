@@ -52,6 +52,25 @@ export function formatDateLong(dateStr: string): string {
     });
 }
 
+export function weekStart(dateStr: string): string {
+    const d = new Date(dateStr + "T00:00:00");
+    const dow = d.getDay(); // 0=Sun, 1=Mon
+    d.setDate(d.getDate() + (dow === 0 ? -6 : 1 - dow));
+    return msToDateStr(d.getTime());
+}
+
+export function formatWeekRange(mondayStr: string): string {
+    const start = new Date(mondayStr + "T00:00:00");
+    const end = new Date(mondayStr + "T00:00:00");
+    end.setDate(end.getDate() + 6);
+    const mo: Intl.DateTimeFormatOptions = { month: "long", day: "numeric" };
+    return (
+        start.toLocaleDateString(undefined, mo) +
+        " – " +
+        end.toLocaleDateString(undefined, { ...mo, year: "numeric" })
+    );
+}
+
 export function formatElapsed(ms: number): string {
     const totalS = Math.max(0, Math.floor(ms / 1000));
     const h = Math.floor(totalS / 3600);
