@@ -2,7 +2,8 @@ import { useStore } from "./store";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const INITIAL: Parameters<typeof useStore.setState>[0] = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const INITIAL: any = {
     clients: {},
     projects: {},
     phases: {},
