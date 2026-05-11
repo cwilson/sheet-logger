@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useStore } from "@/store";
 import { selectActiveEntry } from "@/store";
 import { buildEntryLabel } from "@/lib/entries";
-import { formatElapsed, formatDuration } from "@/lib/time";
+import { formatElapsed, formatDuration, msToTimeStr } from "@/lib/time";
 import {
     fireNotification,
     playBeep,
@@ -32,7 +32,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { TimeEntryTarget } from "@/types";
 
-// ─── Document PiP type declaration ───────────────────────────────────────────
+// ─── Browser API type declarations ───────────────────────────────────────────
 
 declare global {
     interface Window {
@@ -43,6 +43,30 @@ declare global {
             }): Promise<Window & typeof globalThis>;
         };
     }
+}
+
+declare global {
+    // Chrome-only Idle Detection API
+    const IdleDetector:
+        | {
+              new (): {
+                  start(options: {
+                      threshold: number;
+                      signal: AbortSignal;
+                  }): Promise<void>;
+                  readonly userState: "active" | "idle";
+                  addEventListener(
+                      type: "change",
+                      listener: (ev: Event) => void,
+                  ): void;
+                  removeEventListener(
+                      type: "change",
+                      listener: (ev: Event) => void,
+                  ): void;
+              };
+              requestPermission(): Promise<"granted" | "denied">;
+          }
+        | undefined;
 }
 
 // ─── Style cloning helper ─────────────────────────────────────────────────────
@@ -195,6 +219,70 @@ const PopoutTimer = ({ onDock }: { onDock: () => void }) => {
                 </Button>
             </div>
         </div>
+    );
+};
+
+// ─── Idle Prompt Dialog ───────────────────────────────────────────────────────
+
+interface IdlePromptProps {
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+    idleAt: number;
+    returnedAt: number;
+}
+
+const IdlePromptDialog = ({
+    open,
+    onOpenChange,
+    idleAt,
+    returnedAt,
+}: IdlePromptProps) => {
+    const clearTimerIdle = useStore((s) => s.clearTimerIdle);
+    const discardIdleAndStop = useStore((s) => s.discardIdleAndStop);
+    const discardIdleAndContinue = useStore((s) => s.discardIdleAndContinue);
+
+    const idleDuration = returnedAt - idleAt;
+
+    const keepAll = () => {
+        clearTimerIdle();
+        onOpenChange(false);
+    };
+    const discardStop = () => {
+        discardIdleAndStop(idleAt);
+        onOpenChange(false);
+    };
+    const discardContinue = () => {
+        discardIdleAndContinue(idleAt);
+        onOpenChange(false);
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-sm">
+                <DialogHeader>
+                    <DialogTitle>You were away</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-muted-foreground">
+                    Idle for{" "}
+                    <span className="font-medium text-foreground">
+                        {formatDuration(idleDuration)}
+                    </span>{" "}
+                    ({msToTimeStr(idleAt)} – {msToTimeStr(returnedAt)}). What
+                    should happen to that time?
+                </p>
+                <DialogFooter className="flex-col gap-2 sm:flex-col">
+                    <Button variant="outline" onClick={keepAll}>
+                        Keep all
+                    </Button>
+                    <Button variant="outline" onClick={discardStop}>
+                        Discard idle time
+                    </Button>
+                    <Button onClick={discardContinue}>
+                        Discard &amp; continue
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     );
 };
 
@@ -358,9 +446,18 @@ export const TimerWidget = () => {
     const clients = useStore((s) => s.clients);
     const phases = useStore((s) => s.phases);
 
+    const timerIdleAt = useStore((s) => s.timerIdleAt);
+    const setTimerIdle = useStore((s) => s.setTimerIdle);
+
     const [dialogKey, setDialogKey] = useState(0);
     const [startOpen, setStartOpen] = useState(false);
     const [pipWindow, setPipWindow] = useState<Window | null>(null);
+    const [idlePromptOpen, setIdlePromptOpen] = useState(
+        () => useStore.getState().timerIdleAt !== null,
+    );
+    const [idleReturnedAt, setIdleReturnedAt] = useState<number | null>(() =>
+        useStore.getState().timerIdleAt !== null ? Date.now() : null,
+    );
 
     const [now, setNow] = useState(Date.now);
     const activeEntryId = activeEntry?.id;
@@ -405,6 +502,96 @@ export const TimerWidget = () => {
         timerNotifiedEstimate,
         markThresholdNotified,
         markEstimateNotified,
+    ]);
+
+    // Idle detection — IdleDetector API with gap-based fallback.
+    useEffect(() => {
+        if (!activeEntryId || isPaused) return;
+
+        const IDLE_MS = 2 * 60_000;
+        const SLEEP_GAP_MS = 3 * 60_000;
+        let isCurrentlyIdle = false;
+
+        // Shared refs bridging async setup → synchronous cleanup.
+        type DetectorLike = {
+            addEventListener(type: string, fn: (ev: Event) => void): void;
+            removeEventListener(type: string, fn: (ev: Event) => void): void;
+        };
+        const refs: {
+            detector: DetectorLike | null;
+            handler: ((ev: Event) => void) | null;
+            ac: AbortController | null;
+            intervalId: ReturnType<typeof window.setInterval> | null;
+        } = { detector: null, handler: null, ac: null, intervalId: null };
+
+        const onIdle = (at: number) => {
+            if (isCurrentlyIdle) return;
+            isCurrentlyIdle = true;
+            setTimerIdle(at);
+            fireNotification(
+                "Timer still running",
+                "You've been idle — come back to handle it.",
+            );
+        };
+
+        const onReturn = () => {
+            if (!isCurrentlyIdle) return;
+            isCurrentlyIdle = false;
+            setIdleReturnedAt(Date.now());
+            setIdlePromptOpen(true);
+        };
+
+        const setup = async () => {
+            if (typeof IdleDetector !== "undefined") {
+                try {
+                    const perm = await IdleDetector.requestPermission();
+                    if (perm === "granted") {
+                        refs.ac = new AbortController();
+                        const d = new IdleDetector();
+                        refs.detector = d;
+                        refs.handler = () => {
+                            if (d.userState === "idle") onIdle(Date.now());
+                            else onReturn();
+                        };
+                        // eslint-disable-next-line @eslint-react/web-api-no-leaked-event-listener
+                        d.addEventListener("change", refs.handler);
+                        await d.start({
+                            threshold: IDLE_MS,
+                            signal: refs.ac.signal,
+                        });
+                        return;
+                    }
+                } catch {
+                    // fall through to gap fallback
+                }
+            }
+            // Gap fallback: detect sleep/lid-close via unusually large tick gaps.
+            let lastTick = Date.now();
+            refs.intervalId = window.setInterval(() => {
+                const t = Date.now();
+                if (t - lastTick > SLEEP_GAP_MS) {
+                    onIdle(lastTick);
+                    onReturn();
+                }
+                lastTick = t;
+            }, 30_000);
+        };
+
+        setup();
+
+        return () => {
+            if (refs.handler && refs.detector) {
+                refs.detector.removeEventListener("change", refs.handler);
+            }
+            refs.ac?.abort();
+            if (refs.intervalId !== null) clearInterval(refs.intervalId);
+        };
+    }, [
+        activeEntryId,
+        isPaused,
+        setTimerIdle,
+        setIdleReturnedAt,
+        setIdlePromptOpen,
     ]);
 
     // Listen for pip window being closed by the user.
@@ -459,6 +646,16 @@ export const TimerWidget = () => {
               )
             : null;
 
+    const idlePrompt =
+        idlePromptOpen && timerIdleAt !== null && idleReturnedAt !== null ? (
+            <IdlePromptDialog
+                open={idlePromptOpen}
+                onOpenChange={setIdlePromptOpen}
+                idleAt={timerIdleAt}
+                returnedAt={idleReturnedAt}
+            />
+        ) : null;
+
     if (!activeEntry) {
         return (
             <>
@@ -472,6 +669,7 @@ export const TimerWidget = () => {
                     onOpenChange={setStartOpen}
                 />
                 {pipPortal}
+                {idlePrompt}
             </>
         );
     }
@@ -519,6 +717,7 @@ export const TimerWidget = () => {
                     </Button>
                 </div>
                 {pipPortal}
+                {idlePrompt}
             </>
         );
     }
@@ -593,6 +792,7 @@ export const TimerWidget = () => {
                 </Button>
             </div>
             {pipPortal}
+            {idlePrompt}
         </>
     );
 };

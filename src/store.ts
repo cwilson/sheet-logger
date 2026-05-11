@@ -28,6 +28,7 @@ interface TimerState {
     timerEstimateMs: number | null; // optional time budget in ms
     timerNotifiedThreshold: boolean; // 80% notification fired
     timerNotifiedEstimate: boolean; // 100% notification fired
+    timerIdleAt: number | null; // timestamp when idle started; null = active
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -86,6 +87,10 @@ interface Actions {
     cancelTimer: () => void;
     markThresholdNotified: () => void;
     markEstimateNotified: () => void;
+    setTimerIdle: (idleAt: number) => void;
+    clearTimerIdle: () => void;
+    discardIdleAndStop: (idleAt: number) => void;
+    discardIdleAndContinue: (idleAt: number) => void;
 }
 
 // ── Store ────────────────────────────────────────────────────────────────────
@@ -115,6 +120,7 @@ export const useStore = create<StoreState>()(
             timerEstimateMs: null,
             timerNotifiedThreshold: false,
             timerNotifiedEstimate: false,
+            timerIdleAt: null,
 
             // ── Clients ────────────────────────────────────────────────────
             addClient(name) {
@@ -358,6 +364,7 @@ export const useStore = create<StoreState>()(
                     timerEstimateMs: estimateMs ?? null,
                     timerNotifiedThreshold: false,
                     timerNotifiedEstimate: false,
+                    timerIdleAt: null,
                 });
             },
             pauseTimer() {
@@ -382,6 +389,7 @@ export const useStore = create<StoreState>()(
                         activeEntryId: null,
                         timerPausedAt: null,
                         timerPausedMs: 0,
+                        timerIdleAt: null,
                     });
                     return;
                 }
@@ -398,6 +406,7 @@ export const useStore = create<StoreState>()(
                     timerEstimateMs: null,
                     timerNotifiedThreshold: false,
                     timerNotifiedEstimate: false,
+                    timerIdleAt: null,
                 });
             },
             cancelTimer() {
@@ -411,6 +420,7 @@ export const useStore = create<StoreState>()(
                     timerEstimateMs: null,
                     timerNotifiedThreshold: false,
                     timerNotifiedEstimate: false,
+                    timerIdleAt: null,
                 });
             },
             markThresholdNotified() {
@@ -418,6 +428,48 @@ export const useStore = create<StoreState>()(
             },
             markEstimateNotified() {
                 set({ timerNotifiedEstimate: true });
+            },
+            setTimerIdle(idleAt) {
+                set({ timerIdleAt: idleAt });
+            },
+            clearTimerIdle() {
+                set({ timerIdleAt: null });
+            },
+            discardIdleAndStop(idleAt) {
+                const { activeEntryId } = get();
+                if (!activeEntryId) return;
+                get().updateTimeEntry(activeEntryId, { endTime: idleAt });
+                set({
+                    activeEntryId: null,
+                    timerPausedAt: null,
+                    timerPausedMs: 0,
+                    timerEstimateMs: null,
+                    timerNotifiedThreshold: false,
+                    timerNotifiedEstimate: false,
+                    timerIdleAt: null,
+                });
+            },
+            discardIdleAndContinue(idleAt) {
+                const { activeEntryId } = get();
+                if (!activeEntryId) return;
+                const entry = get().timeEntries[activeEntryId];
+                if (!entry) return;
+                get().updateTimeEntry(activeEntryId, { endTime: idleAt });
+                const newEntry = get().addTimeEntry({
+                    target: entry.target,
+                    startTime: now(),
+                    endTime: null,
+                    ...(entry.notes ? { notes: entry.notes } : {}),
+                });
+                set({
+                    activeEntryId: newEntry.id,
+                    timerPausedAt: null,
+                    timerPausedMs: 0,
+                    timerEstimateMs: null,
+                    timerNotifiedThreshold: false,
+                    timerNotifiedEstimate: false,
+                    timerIdleAt: null,
+                });
             },
         }),
         { name: "sheet-logger" },
