@@ -36,25 +36,8 @@ import {
     CaretDownIcon,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { buildEntryLabel } from "@/lib/entries";
 import type { TimeEntry, TimeEntryTarget } from "@/types";
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function buildEntryLabel(
-    entry: TimeEntry,
-    tasks: ReturnType<typeof useStore.getState>["tasks"],
-    projects: ReturnType<typeof useStore.getState>["projects"],
-    clients: ReturnType<typeof useStore.getState>["clients"],
-    phases: ReturnType<typeof useStore.getState>["phases"],
-): string {
-    const t = entry.target;
-    const parts: (string | undefined)[] = [];
-    if ("clientId" in t) parts.push(clients[t.clientId]?.name);
-    if ("projectId" in t) parts.push(projects[t.projectId]?.name);
-    if ("phaseId" in t && t.phaseId) parts.push(phases[t.phaseId]?.name);
-    if ("taskId" in t) parts.push(tasks[t.taskId]?.name);
-    return parts.filter(Boolean).join(" › ") || "Unknown";
-}
 
 // ─── Form & group state ───────────────────────────────────────────────────────
 

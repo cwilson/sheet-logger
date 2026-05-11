@@ -52,6 +52,20 @@ export function formatDateLong(dateStr: string): string {
     });
 }
 
+export function formatElapsed(ms: number): string {
+    const totalS = Math.max(0, Math.floor(ms / 1000));
+    const h = Math.floor(totalS / 3600);
+    const m = Math.floor((totalS % 3600) / 60);
+    const s = totalS % 60;
+    return (
+        String(h).padStart(2, "0") +
+        ":" +
+        String(m).padStart(2, "0") +
+        ":" +
+        String(s).padStart(2, "0")
+    );
+}
+
 export function addDays(dateStr: string, delta: number): string {
     const d = new Date(dateStr + "T00:00:00");
     d.setDate(d.getDate() + delta);

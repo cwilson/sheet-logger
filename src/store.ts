@@ -23,6 +23,8 @@ interface EntityMaps {
 
 interface TimerState {
     activeEntryId: string | null;
+    timerPausedAt: number | null; // timestamp when paused; null = running
+    timerPausedMs: number; // total accumulated pause duration
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -70,7 +72,9 @@ interface Actions {
     removeTimeEntry: (id: string) => void;
 
     // Timer controls
-    startTimer: (target: TimeEntryTarget) => void;
+    startTimer: (target: TimeEntryTarget, notes?: string) => void;
+    pauseTimer: () => void;
+    resumeTimer: () => void;
     stopTimer: () => void;
     cancelTimer: () => void;
 }
@@ -97,6 +101,8 @@ export const useStore = create<StoreState>()(
             tasks: {},
             timeEntries: {},
             activeEntryId: null,
+            timerPausedAt: null,
+            timerPausedMs: 0,
 
             // ── Clients ────────────────────────────────────────────────────
             addClient(name) {
@@ -325,27 +331,66 @@ export const useStore = create<StoreState>()(
             },
 
             // ── Timer ──────────────────────────────────────────────────────
-            startTimer(target) {
-                // Stop any running timer first
+            startTimer(target, notes) {
                 get().stopTimer();
                 const entry = get().addTimeEntry({
                     target,
                     startTime: now(),
                     endTime: null,
+                    ...(notes ? { notes } : {}),
                 });
-                set({ activeEntryId: entry.id });
+                set({
+                    activeEntryId: entry.id,
+                    timerPausedAt: null,
+                    timerPausedMs: 0,
+                });
+            },
+            pauseTimer() {
+                const { activeEntryId, timerPausedAt } = get();
+                if (!activeEntryId || timerPausedAt !== null) return;
+                set({ timerPausedAt: now() });
+            },
+            resumeTimer() {
+                const { timerPausedAt, timerPausedMs } = get();
+                if (timerPausedAt === null) return;
+                set({
+                    timerPausedAt: null,
+                    timerPausedMs: timerPausedMs + (now() - timerPausedAt),
+                });
             },
             stopTimer() {
-                const { activeEntryId } = get();
+                const { activeEntryId, timerPausedAt, timerPausedMs } = get();
                 if (!activeEntryId) return;
-                get().updateTimeEntry(activeEntryId, { endTime: now() });
-                set({ activeEntryId: null });
+                const entry = get().timeEntries[activeEntryId];
+                if (!entry) {
+                    set({
+                        activeEntryId: null,
+                        timerPausedAt: null,
+                        timerPausedMs: 0,
+                    });
+                    return;
+                }
+                const wallEnd = timerPausedAt ?? now();
+                const effectiveDuration =
+                    wallEnd - entry.startTime - timerPausedMs;
+                get().updateTimeEntry(activeEntryId, {
+                    endTime: entry.startTime + Math.max(0, effectiveDuration),
+                });
+                set({
+                    activeEntryId: null,
+                    timerPausedAt: null,
+                    timerPausedMs: 0,
+                });
             },
             cancelTimer() {
                 const { activeEntryId } = get();
                 if (!activeEntryId) return;
                 get().removeTimeEntry(activeEntryId);
-                set({ activeEntryId: null });
+                set({
+                    activeEntryId: null,
+                    timerPausedAt: null,
+                    timerPausedMs: 0,
+                });
             },
         }),
         { name: "sheet-logger" },

@@ -1,6 +1,7 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { Sun, CalendarBlank, Gear } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
+import { TimerWidget } from "@/components/timer-widget";
 
 const navItems = [
     { to: "/", label: "Day", icon: Sun, end: true },
@@ -34,6 +35,9 @@ export const Layout = () => {
                             {label}
                         </NavLink>
                     ))}
+                    <div className="ml-auto">
+                        <TimerWidget />
+                    </div>
                 </nav>
             </header>
 

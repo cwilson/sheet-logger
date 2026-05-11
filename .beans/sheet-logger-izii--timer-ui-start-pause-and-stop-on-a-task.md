@@ -1,14 +1,22 @@
 ---
 # sheet-logger-izii
 title: "Timer UI: start, pause, and stop on a task"
-status: todo
+status: completed
 type: feature
 priority: normal
 created_at: 2026-05-10T21:42:01Z
-updated_at: 2026-05-10T22:11:02Z
+updated_at: 2026-05-11T02:13:10Z
 parent: sheet-logger-40bc
 ---
 
 A timer embedded in the nav header, always visible. User can start it on any task. Shows elapsed time live. Supports pause/resume and stop (which creates a TimeEntry). Only one timer runs at a time.
 
 When starting the timer, the user selects a task via searchable Combobox (displays full Client › Project › Phase › Task path) and is optionally prompted for: a time estimate (h/m) and notes (free text). Both can also be added or edited after the fact on the resulting TimeEntry.
+
+## Summary of Changes
+
+- Added `src/lib/entries.ts`: shared `buildEntryLabel` utility (moved from day-view.tsx)
+- Added `formatElapsed` to `src/lib/time.ts`: HH:MM:SS formatter
+- Extended `src/store.ts`: added `timerPausedAt`/`timerPausedMs` state, `pauseTimer`/`resumeTimer` actions, updated `startTimer` (accepts optional notes), updated `stopTimer` (adjusts endTime to exclude paused duration)
+- Added `src/components/timer-widget.tsx`: always-visible header widget with task label, live HH:MM:SS counter, pause/resume/stop/cancel controls; `StartDialog` with TaskPicker and notes field
+- Updated `src/components/layout.tsx`: renders TimerWidget right-aligned in nav
