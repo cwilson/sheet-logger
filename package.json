@@ -45,7 +45,6 @@
         "husky": "^9.1.7",
         "jsdom": "^29.1.1",
         "lint-staged": "^17.0.3",
-        "msw": "^2.14.5",
         "prettier": "^3.8.3",
         "typescript": "~6.0.2",
         "typescript-eslint": "^8.58.2",
@@ -55,8 +54,5 @@
     "lint-staged": {
         "*.{ts,tsx}": "eslint --fix",
         "*.{ts,tsx,css,md}": "prettier --check"
-    },
-    "pnpm": {
-        "ignoredBuiltDependencies": ["msw"]
     }
 }

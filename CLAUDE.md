@@ -59,5 +59,3 @@ A pre-commit hook (Husky + lint-staged) automatically runs:
 - `prettier --write` on staged `*.{ts,tsx,css,md}` files
 
 Prettier config: 4-space indents, double quotes, semicolons.
-
-**MSW** is installed for mocking in tests. Vitest globals are enabled — no need to import `describe`, `it`, `expect`.
