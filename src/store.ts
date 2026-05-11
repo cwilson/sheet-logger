@@ -25,6 +25,9 @@ interface TimerState {
     activeEntryId: string | null;
     timerPausedAt: number | null; // timestamp when paused; null = running
     timerPausedMs: number; // total accumulated pause duration
+    timerEstimateMs: number | null; // optional time budget in ms
+    timerNotifiedThreshold: boolean; // 80% notification fired
+    timerNotifiedEstimate: boolean; // 100% notification fired
 }
 
 // ── Actions ──────────────────────────────────────────────────────────────────
@@ -72,11 +75,17 @@ interface Actions {
     removeTimeEntry: (id: string) => void;
 
     // Timer controls
-    startTimer: (target: TimeEntryTarget, notes?: string) => void;
+    startTimer: (
+        target: TimeEntryTarget,
+        notes?: string,
+        estimateMs?: number,
+    ) => void;
     pauseTimer: () => void;
     resumeTimer: () => void;
     stopTimer: () => void;
     cancelTimer: () => void;
+    markThresholdNotified: () => void;
+    markEstimateNotified: () => void;
 }
 
 // ── Store ────────────────────────────────────────────────────────────────────
@@ -103,6 +112,9 @@ export const useStore = create<StoreState>()(
             activeEntryId: null,
             timerPausedAt: null,
             timerPausedMs: 0,
+            timerEstimateMs: null,
+            timerNotifiedThreshold: false,
+            timerNotifiedEstimate: false,
 
             // ── Clients ────────────────────────────────────────────────────
             addClient(name) {
@@ -331,7 +343,7 @@ export const useStore = create<StoreState>()(
             },
 
             // ── Timer ──────────────────────────────────────────────────────
-            startTimer(target, notes) {
+            startTimer(target, notes, estimateMs) {
                 get().stopTimer();
                 const entry = get().addTimeEntry({
                     target,
@@ -343,6 +355,9 @@ export const useStore = create<StoreState>()(
                     activeEntryId: entry.id,
                     timerPausedAt: null,
                     timerPausedMs: 0,
+                    timerEstimateMs: estimateMs ?? null,
+                    timerNotifiedThreshold: false,
+                    timerNotifiedEstimate: false,
                 });
             },
             pauseTimer() {
@@ -380,6 +395,9 @@ export const useStore = create<StoreState>()(
                     activeEntryId: null,
                     timerPausedAt: null,
                     timerPausedMs: 0,
+                    timerEstimateMs: null,
+                    timerNotifiedThreshold: false,
+                    timerNotifiedEstimate: false,
                 });
             },
             cancelTimer() {
@@ -390,7 +408,16 @@ export const useStore = create<StoreState>()(
                     activeEntryId: null,
                     timerPausedAt: null,
                     timerPausedMs: 0,
+                    timerEstimateMs: null,
+                    timerNotifiedThreshold: false,
+                    timerNotifiedEstimate: false,
                 });
+            },
+            markThresholdNotified() {
+                set({ timerNotifiedThreshold: true });
+            },
+            markEstimateNotified() {
+                set({ timerNotifiedEstimate: true });
             },
         }),
         { name: "sheet-logger" },
