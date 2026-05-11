@@ -63,7 +63,9 @@ interface Actions {
     ) => TimeEntry;
     updateTimeEntry: (
         id: string,
-        patch: Partial<Pick<TimeEntry, "startTime" | "endTime" | "notes">>,
+        patch: Partial<
+            Pick<TimeEntry, "startTime" | "endTime" | "notes" | "target">
+        >,
     ) => void;
     removeTimeEntry: (id: string) => void;
 
