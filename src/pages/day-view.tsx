@@ -365,6 +365,53 @@ const EntryRow = ({ entry, label, onEdit, onDelete }: EntryRowProps) => {
     );
 };
 
+// ─── Day Analytics ───────────────────────────────────────────────────────────
+
+const TARGET_MS = 8 * 60 * 60 * 1000;
+
+interface DayAnalyticsProps {
+    entries: TimeEntry[];
+}
+
+const DayAnalytics = ({ entries }: DayAnalyticsProps) => {
+    const loggedMs = entries.reduce(
+        (sum, e) => sum + (e.endTime !== null ? e.endTime - e.startTime : 0),
+        0,
+    );
+    const pct = Math.min(loggedMs / TARGET_MS, 1);
+    const remainingMs = Math.max(TARGET_MS - loggedMs, 0);
+    const done = loggedMs >= TARGET_MS;
+
+    return (
+        <div className="flex items-center gap-3 border-b border-border px-6 py-2">
+            <div className="relative h-1.5 flex-1 overflow-hidden bg-muted">
+                <div
+                    className={cn(
+                        "absolute inset-y-0 left-0 transition-all",
+                        done ? "bg-emerald-500" : "bg-primary",
+                    )}
+                    style={{ width: `${pct * 100}%` }}
+                />
+            </div>
+            <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                {done ? (
+                    <span className="text-emerald-500">
+                        {formatDuration(loggedMs)} logged
+                    </span>
+                ) : (
+                    <>
+                        {formatDuration(loggedMs)}{" "}
+                        <span className="text-muted-foreground/50">/ 8h</span>
+                        <span className="ml-2 text-muted-foreground/50">
+                            {formatDuration(remainingMs)} left
+                        </span>
+                    </>
+                )}
+            </span>
+        </div>
+    );
+};
+
 // ─── Day View ─────────────────────────────────────────────────────────────────
 
 export const DayView = () => {
@@ -439,6 +486,8 @@ export const DayView = () => {
                     Add entry
                 </Button>
             </div>
+
+            <DayAnalytics entries={todayEntries} />
 
             {/* Entry list */}
             <div className="flex-1 overflow-y-auto">
