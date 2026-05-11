@@ -5,7 +5,7 @@ import path from "path";
 
 // https://vite.dev/config/
 export default defineConfig({
-    base: process.env.GITHUB_ACTIONS ? "/sheet-logger/" : "/",
+    base: "/",
     plugins: [react(), tailwindcss()],
     resolve: {
         alias: {
