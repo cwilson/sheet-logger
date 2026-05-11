@@ -14,6 +14,11 @@ import {
 import { TaskPicker } from "@/components/task-picker";
 import { Button } from "@/components/ui/button";
 import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
     Dialog,
     DialogContent,
     DialogFooter,
@@ -28,6 +33,7 @@ import {
     TrashIcon,
     CaretLeftIcon,
     CaretRightIcon,
+    CaretDownIcon,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import type { TimeEntry, TimeEntryTarget } from "@/types";
@@ -50,7 +56,22 @@ function buildEntryLabel(
     return parts.filter(Boolean).join(" › ") || "Unknown";
 }
 
-// ─── Form state ───────────────────────────────────────────────────────────────
+// ─── Form & group state ───────────────────────────────────────────────────────
+
+interface TaskPreset {
+    taskId: string;
+    clientId: string;
+    projectId: string;
+    phaseId?: string;
+}
+
+interface TaskGroup {
+    key: string;
+    label: string;
+    preset: TaskPreset;
+    totalMs: number;
+    entries: TimeEntry[];
+}
 
 interface EntryForm {
     taskId: string;
@@ -68,12 +89,12 @@ interface FormErrors {
     endTime?: string;
 }
 
-function emptyForm(date: string): EntryForm {
+function emptyForm(date: string, preset?: TaskPreset): EntryForm {
     return {
-        taskId: "",
-        clientId: "",
-        projectId: "",
-        phaseId: "",
+        taskId: preset?.taskId ?? "",
+        clientId: preset?.clientId ?? "",
+        projectId: preset?.projectId ?? "",
+        phaseId: preset?.phaseId ?? "",
         date,
         startTime: "",
         endTime: "",
@@ -95,6 +116,52 @@ function formFromEntry(entry: TimeEntry): EntryForm {
     };
 }
 
+function groupEntries(
+    entries: TimeEntry[],
+    tasks: ReturnType<typeof useStore.getState>["tasks"],
+    projects: ReturnType<typeof useStore.getState>["projects"],
+    clients: ReturnType<typeof useStore.getState>["clients"],
+    phases: ReturnType<typeof useStore.getState>["phases"],
+): TaskGroup[] {
+    const map = new Map<string, TaskGroup>();
+
+    for (const entry of entries) {
+        const t = entry.target;
+        const key =
+            t.level === "task"
+                ? `task:${t.taskId}`
+                : t.level === "phase"
+                  ? `phase:${t.phaseId}`
+                  : t.level === "project"
+                    ? `project:${t.projectId}`
+                    : `client:${t.clientId}`;
+
+        if (!map.has(key)) {
+            const label = buildEntryLabel(
+                entry,
+                tasks,
+                projects,
+                clients,
+                phases,
+            );
+            const preset: TaskPreset = {
+                taskId: t.level === "task" ? t.taskId : "",
+                clientId: "clientId" in t ? t.clientId : "",
+                projectId: "projectId" in t ? t.projectId : "",
+                phaseId: "phaseId" in t && t.phaseId ? t.phaseId : undefined,
+            };
+            map.set(key, { key, label, preset, totalMs: 0, entries: [] });
+        }
+
+        const group = map.get(key)!;
+        group.entries.push(entry);
+        if (entry.endTime !== null)
+            group.totalMs += entry.endTime - entry.startTime;
+    }
+
+    return Array.from(map.values());
+}
+
 // ─── Entry Dialog ─────────────────────────────────────────────────────────────
 
 interface EntryDialogProps {
@@ -102,6 +169,7 @@ interface EntryDialogProps {
     onOpenChange: (open: boolean) => void;
     editingEntry: TimeEntry | null;
     defaultDate: string;
+    preset?: TaskPreset | null;
 }
 
 // Mounted fresh via `key` on each open — no useEffect reset needed.
@@ -110,12 +178,15 @@ const EntryDialog = ({
     onOpenChange,
     editingEntry,
     defaultDate,
+    preset,
 }: EntryDialogProps) => {
     const addTimeEntry = useStore((s) => s.addTimeEntry);
     const updateTimeEntry = useStore((s) => s.updateTimeEntry);
 
     const [form, setForm] = useState<EntryForm>(() =>
-        editingEntry ? formFromEntry(editingEntry) : emptyForm(defaultDate),
+        editingEntry
+            ? formFromEntry(editingEntry)
+            : emptyForm(defaultDate, preset ?? undefined),
     );
     const [errors, setErrors] = useState<FormErrors>({});
 
@@ -306,66 +377,120 @@ const EntryDialog = ({
 
 interface EntryRowProps {
     entry: TimeEntry;
-    label: string;
     onEdit: () => void;
     onDelete: () => void;
 }
 
-const EntryRow = ({ entry, label, onEdit, onDelete }: EntryRowProps) => {
+const EntryRow = ({ entry, onEdit, onDelete }: EntryRowProps) => {
     const duration =
         entry.endTime !== null
             ? formatDuration(entry.endTime - entry.startTime)
             : null;
 
     return (
-        <div className="group px-6 py-2.5 hover:bg-muted/40">
-            <div className="flex items-center gap-3">
-                <span className="min-w-0 flex-1 truncate text-xs">{label}</span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                    {msToTimeStr(entry.startTime)}
-                    {" – "}
-                    {entry.endTime !== null
-                        ? msToTimeStr(entry.endTime)
-                        : "running"}
-                </span>
-                <span
-                    className={cn(
-                        "w-12 shrink-0 text-right text-xs font-medium",
-                        !duration && "text-muted-foreground",
-                    )}
+        <div className="group flex items-center gap-3 py-1.5 pl-10 pr-4 hover:bg-muted/30">
+            <span className="shrink-0 tabular-nums text-xs text-muted-foreground">
+                {msToTimeStr(entry.startTime)}
+                {" – "}
+                {entry.endTime !== null
+                    ? msToTimeStr(entry.endTime)
+                    : "running"}
+            </span>
+            <span className="w-10 shrink-0 text-right tabular-nums text-xs text-muted-foreground">
+                {duration ?? "—"}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs italic text-muted-foreground/60">
+                {entry.notes}
+            </span>
+            <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={onEdit}
+                    title="Edit"
                 >
-                    {duration ?? "—"}
-                </span>
-                <div className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={onEdit}
-                        title="Edit"
-                    >
-                        <PencilSimpleIcon />
-                    </Button>
-                    <Button
-                        variant="ghost"
-                        size="icon-sm"
-                        onClick={onDelete}
-                        title="Delete"
-                        className="text-destructive hover:text-destructive"
-                    >
-                        <TrashIcon />
-                    </Button>
-                </div>
+                    <PencilSimpleIcon />
+                </Button>
+                <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={onDelete}
+                    title="Delete"
+                    className="text-destructive hover:text-destructive"
+                >
+                    <TrashIcon />
+                </Button>
             </div>
-            {entry.notes && (
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {entry.notes}
-                </p>
-            )}
         </div>
     );
 };
 
-// ─── Day Analytics ───────────────────────────────────────────────────────────
+// ─── Task Group Row ───────────────────────────────────────────────────────────
+
+interface TaskGroupRowProps {
+    group: TaskGroup;
+    onEdit: (entry: TimeEntry) => void;
+    onDelete: (id: string) => void;
+    onAdd: (preset: TaskPreset) => void;
+}
+
+const TaskGroupRow = ({
+    group,
+    onEdit,
+    onDelete,
+    onAdd,
+}: TaskGroupRowProps) => {
+    const [open, setOpen] = useState(true);
+
+    return (
+        <Collapsible
+            open={open}
+            onOpenChange={setOpen}
+            className="border-b border-border"
+        >
+            <div className="group flex items-center gap-1.5 px-4 py-2 hover:bg-muted/40">
+                <CollapsibleTrigger asChild>
+                    <Button
+                        variant="ghost"
+                        size="icon-xs"
+                        className="shrink-0 text-muted-foreground"
+                    >
+                        {open ? <CaretDownIcon /> : <CaretRightIcon />}
+                    </Button>
+                </CollapsibleTrigger>
+                <span className="min-w-0 flex-1 truncate text-xs font-medium">
+                    {group.label}
+                </span>
+                {group.totalMs > 0 && (
+                    <span className="shrink-0 tabular-nums text-xs font-medium text-muted-foreground">
+                        {formatDuration(group.totalMs)}
+                    </span>
+                )}
+                <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    onClick={() => onAdd(group.preset)}
+                    title="Add entry for this task"
+                    className="shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                >
+                    <PlusIcon />
+                </Button>
+            </div>
+            <CollapsibleContent>
+                {group.entries.map((entry) => (
+                    <EntryRow
+                        key={entry.id}
+                        entry={entry}
+                        onEdit={() => onEdit(entry)}
+                        onDelete={() => onDelete(entry.id)}
+                    />
+                ))}
+            </CollapsibleContent>
+        </Collapsible>
+    );
+};
+
+// ─── Day Analytics ────────────────────────────────────────────────────────────
 
 const TARGET_MS = 8 * 60 * 60 * 1000;
 
@@ -419,6 +544,7 @@ export const DayView = () => {
     const [dialogKey, setDialogKey] = useState(0);
     const [dialogOpen, setDialogOpen] = useState(false);
     const [editingEntry, setEditingEntry] = useState<TimeEntry | null>(null);
+    const [addPreset, setAddPreset] = useState<TaskPreset | null>(null);
 
     const allEntries = useStore(useShallow(selectTimeEntries));
     const tasks = useStore((s) => s.tasks);
@@ -435,15 +561,22 @@ export const DayView = () => {
         [allEntries, viewDate],
     );
 
+    const grouped = useMemo(
+        () => groupEntries(todayEntries, tasks, projects, clients, phases),
+        [todayEntries, tasks, projects, clients, phases],
+    );
+
     const isToday = viewDate === todayStr();
 
-    const openAdd = () => {
+    const openAdd = (preset?: TaskPreset) => {
+        setAddPreset(preset ?? null);
         setEditingEntry(null);
         setDialogKey((k) => k + 1);
         setDialogOpen(true);
     };
 
     const openEdit = (entry: TimeEntry) => {
+        setAddPreset(null);
         setEditingEntry(entry);
         setDialogKey((k) => k + 1);
         setDialogOpen(true);
@@ -481,7 +614,7 @@ export const DayView = () => {
                 >
                     <CaretRightIcon />
                 </Button>
-                <Button size="sm" onClick={openAdd}>
+                <Button size="sm" onClick={() => openAdd()}>
                     <PlusIcon />
                     Add entry
                 </Button>
@@ -489,9 +622,9 @@ export const DayView = () => {
 
             <DayAnalytics entries={todayEntries} />
 
-            {/* Entry list */}
+            {/* Grouped entry list */}
             <div className="flex-1 overflow-y-auto">
-                {todayEntries.length === 0 ? (
+                {grouped.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-20 text-center">
                         <p className="text-sm text-muted-foreground">
                             No entries for this day.
@@ -500,30 +633,22 @@ export const DayView = () => {
                             variant="outline"
                             size="sm"
                             className="mt-3"
-                            onClick={openAdd}
+                            onClick={() => openAdd()}
                         >
                             <PlusIcon />
                             Add entry
                         </Button>
                     </div>
                 ) : (
-                    <div className="divide-y divide-border">
-                        {todayEntries.map((entry) => (
-                            <EntryRow
-                                key={entry.id}
-                                entry={entry}
-                                label={buildEntryLabel(
-                                    entry,
-                                    tasks,
-                                    projects,
-                                    clients,
-                                    phases,
-                                )}
-                                onEdit={() => openEdit(entry)}
-                                onDelete={() => removeTimeEntry(entry.id)}
-                            />
-                        ))}
-                    </div>
+                    grouped.map((group) => (
+                        <TaskGroupRow
+                            key={group.key}
+                            group={group}
+                            onEdit={openEdit}
+                            onDelete={removeTimeEntry}
+                            onAdd={openAdd}
+                        />
+                    ))
                 )}
             </div>
 
@@ -533,6 +658,7 @@ export const DayView = () => {
                 onOpenChange={setDialogOpen}
                 editingEntry={editingEntry}
                 defaultDate={viewDate}
+                preset={addPreset}
             />
         </div>
     );
