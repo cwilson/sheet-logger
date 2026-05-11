@@ -10,6 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - This is a collaboration — ask Captain W questions freely. He has a lot of experience and is happy to help.
 - **No shortcuts.** Respect the typechecker and linter. When there's an error, find the root cause and fix it properly. Only use workarounds with Captain W's explicit approval — asking is always fine.
 - Commit changes corresponding to completed tasks, but **do not push branches**.
+- When closing a bean (marking it completed or scrapped), **include the `.beans/` file in the same commit as the related code changes** — never in a separate follow-up commit.
 
 ## Commands
 
@@ -21,6 +22,7 @@ pnpm lint       # Run ESLint
 pnpm test       # Run Vitest (watch mode)
 pnpm autoformat # Prettier --write to fix formatting
 pnpm typecheck  # Run Type-check only
+pnpm dlx shadcn@latest add [component]  # add shadcn components
 ```
 
 Use `pnpm` — the lockfile is committed and the project is pnpm-only.
